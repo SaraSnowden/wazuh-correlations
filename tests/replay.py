@@ -6,6 +6,8 @@ import re
 import subprocess
 from uuid import NAMESPACE_URL, uuid5
 
+import cloudtrail_cases
+
 
 def event(verb, resource, name, *, group="", sub="", code=200, stage="ResponseComplete"):
     namespace = "payments"
@@ -67,23 +69,32 @@ def cases():
     ]
 
 
-ALERTS = {"110413", "110423", "110432", "110442"}
+ALERTS = {"110413", "110423", "110432", "110442", "110513", "110523", "110532"}
 
 
 def records(name, events):
     for index, entry in enumerate(events):
-        yield json.dumps(dict(entry, auditID=str(uuid5(NAMESPACE_URL, f"{name}/{index}"))))
+        event_id = str(uuid5(NAMESPACE_URL, f"{name}/{index}"))
+        if entry.get("integration") == "aws":
+            yield json.dumps(dict(entry, aws=dict(entry["aws"], eventID=event_id)))
+        else:
+            yield json.dumps(dict(entry, auditID=event_id))
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--container", help="run logtest via docker exec")
     parser.add_argument("--emit", help="print one named JSONL fixture")
+    parser.add_argument("--suite", choices=("kubernetes", "cloudtrail", "all"), default="kubernetes")
     args = parser.parse_args()
     cmd = ["/var/ossec/bin/wazuh-logtest"]
     if args.container:
         cmd = ["docker", "exec", "-i", args.container] + cmd
-    scenarios = cases()
+    scenarios = []
+    if args.suite in ("kubernetes", "all"):
+        scenarios.extend(cases())
+    if args.suite in ("cloudtrail", "all"):
+        scenarios.extend(cloudtrail_cases.cases())
     if args.emit:
         for name, events, _ in scenarios:
             if name == args.emit:

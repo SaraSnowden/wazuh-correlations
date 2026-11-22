@@ -1,0 +1,76 @@
+<group name="local,cloudtrail_correlation,">
+  <rule id="110510" level="4">
+    <if_sid>80200</if_sid>
+    <field name="aws.source" type="pcre2">^cloudtrail$</field>
+    <field name="aws.eventType" type="pcre2">^AwsApiCall$</field>
+    <field name="aws.eventName" type="pcre2">^(DisableKey|ScheduleKeyDeletion|DeleteSubscriptionFilter|DeleteLogGroup|StopConfigurationRecorder)$</field>
+    <field name="aws.recipientAccountId" type="pcre2">^[0-9]{12}$</field>
+    <field name="aws.awsRegion" type="pcre2">^.+$</field>
+    <match type="pcre2" negate="yes">"(?:errorCode|errorMessage)"\s*:</match>
+    <description>CloudTrail management call relevant to resource availability</description>
+  </rule>
+
+  <rule id="110511" level="3">
+    <if_sid>110510</if_sid>
+    <field name="aws.eventSource" type="pcre2">^kms\.amazonaws\.com$</field>
+    <field name="aws.eventName">^DisableKey$</field>
+    <field name="aws.responseElements.keyId" type="pcre2">^arn:[^:]+:kms:[^:]+:[0-9]{12}:key/.+$</field>
+    <description>KMS key disabled</description>
+  </rule>
+  <rule id="110512" level="5">
+    <if_sid>110510</if_sid>
+    <field name="aws.eventSource" type="pcre2">^kms\.amazonaws\.com$</field>
+    <field name="aws.eventName">^ScheduleKeyDeletion$</field>
+    <field name="aws.responseElements.keyState" type="pcre2">^(PendingDeletion|PendingReplicaDeletion)$</field>
+    <field name="aws.responseElements.keyId" type="pcre2">^arn:[^:]+:kms:[^:]+:[0-9]{12}:key/.+$</field>
+    <description>KMS key entered a pending deletion state</description>
+  </rule>
+  <rule id="110513" level="10" frequency="2" timeframe="900">
+    <if_sid>110512</if_sid>
+    <if_matched_sid>110511</if_matched_sid>
+    <same_field>aws.responseElements.keyId</same_field>
+    <same_field>aws.recipientAccountId</same_field>
+    <description>Deletion scheduled after disablement of $(aws.responseElements.keyId)</description>
+  </rule>
+
+  <rule id="110521" level="3">
+    <if_sid>110510</if_sid>
+    <field name="aws.eventSource" type="pcre2">^logs\.amazonaws\.com$</field>
+    <field name="aws.eventName">^DeleteSubscriptionFilter$</field>
+    <field name="aws.requestParameters.logGroupName" type="pcre2">^.+$</field>
+    <field name="aws.requestParameters.filterName" type="pcre2">^.+$</field>
+    <description>Subscription filter removed from a CloudWatch Logs group</description>
+  </rule>
+  <rule id="110522" level="4">
+    <if_sid>110510</if_sid>
+    <field name="aws.eventSource" type="pcre2">^logs\.amazonaws\.com$</field>
+    <field name="aws.eventName">^DeleteLogGroup$</field>
+    <field name="aws.requestParameters.logGroupName" type="pcre2">^.+$</field>
+    <description>CloudWatch Logs group deleted</description>
+  </rule>
+  <rule id="110523" level="10" frequency="2" timeframe="600">
+    <if_sid>110522</if_sid>
+    <if_matched_sid>110521</if_matched_sid>
+    <same_field>aws.recipientAccountId</same_field>
+    <same_field>aws.awsRegion</same_field>
+    <same_field>aws.requestParameters.logGroupName</same_field>
+    <description>Log group $(aws.requestParameters.logGroupName) deleted after subscription removal in $(aws.awsRegion)</description>
+  </rule>
+
+  <rule id="110531" level="4">
+    <if_sid>110510</if_sid>
+    <field name="aws.eventSource" type="pcre2">^config\.amazonaws\.com$</field>
+    <field name="aws.eventName">^StopConfigurationRecorder$</field>
+    <field name="aws.userIdentity.arn" type="pcre2">^arn:.+$</field>
+    <field name="aws.requestParameters.configurationRecorderName" type="pcre2">^.+$</field>
+    <description>AWS Config recorder stop request completed</description>
+  </rule>
+  <rule id="110532" level="10" frequency="2" timeframe="600">
+    <if_sid>110531</if_sid>
+    <if_matched_sid>110531</if_matched_sid>
+    <same_field>aws.recipientAccountId</same_field>
+    <same_field>aws.userIdentity.arn</same_field>
+    <different_field>aws.awsRegion</different_field>
+    <description>$(aws.userIdentity.arn) stopped AWS Config recorders across regions in account $(aws.recipientAccountId)</description>
+  </rule>
+</group>

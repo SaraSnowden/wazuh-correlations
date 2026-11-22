@@ -1,6 +1,15 @@
-# Temporal Correlation of Kubernetes Audit Events in Wazuh
+# Temporal Correlation of Audit Events in Wazuh
 
-This repository contains four Wazuh rules for identifying changes in access and network isolation from sequences of Kubernetes API requests. Each rule defines which fields must match or differ across events and how closely in time the events must occur. The rules use the built-in Wazuh JSON decoder and accept one Kubernetes audit event per line. The accompanying tests run on a Wazuh manager without access to a Kubernetes cluster.
+The repository contains seven temporal correlations for two audit sources. Each suite includes Wazuh XML rules, synthetic event sequences, and a replay transcript from Wazuh Manager 4.14.10.
+
+| Audit source | Detection coverage |
+|---|---|
+| [AWS CloudTrail](docs/cloudtrail.md) | KMS key retirement, CloudWatch Logs subscription and group deletion, and AWS Config recorder stops across regions |
+| [Kubernetes Audit](#kubernetes-audit) | Interactive pod access, short-lived role bindings, token issuance, and network policy deletion |
+
+## Kubernetes Audit
+
+Four rules identify changes in access and network isolation from sequences of Kubernetes API requests. Each rule defines which fields must match or differ across events and how closely in time the events must occur. The rules use the built-in Wazuh JSON decoder and accept one Kubernetes audit event per line. The accompanying tests run on a Wazuh manager without access to a Kubernetes cluster.
 
 ## Detection criteria
 
