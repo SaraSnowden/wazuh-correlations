@@ -1,0 +1,17 @@
+PASS pod-attach: 110411, 110413
+PASS unrelated-pod: 110411, 110412
+PASS same-pod-name-elsewhere: 110411, 110412
+PASS attach-came-first: 110412, 110411
+PASS attach-only: 110412, 110412
+PASS short-lived-binding: 110421, 110423
+PASS different-binding: 110421, 110422
+PASS dry-run-grant: 110422
+PASS delete-only: 110422, 110422
+PASS token-pair: 110431, 110432
+PASS same-token-target: 110431, 110431
+PASS tokens-in-different-namespaces: 110431, 110431
+PASS different-requester: 110431, 110431
+PASS kubelet-rotation: 110410, 110410
+PASS cross-namespace-cleanup: 110441, 110442
+PASS same-namespace-cleanup: 110441, 110441
+PASS second-delete-denied: 110441, 110410
