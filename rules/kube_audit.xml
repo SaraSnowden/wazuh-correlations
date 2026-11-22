@@ -1,0 +1,101 @@
+<group name="local,kube_audit,">
+  <rule id="110410" level="2">
+    <decoded_as>json</decoded_as>
+    <field name="apiVersion" type="pcre2">^audit\.k8s\.io/v1$</field>
+    <field name="kind" type="pcre2">^Event$</field>
+    <field name="objectRef.resource" type="pcre2">^(pods|rolebindings|serviceaccounts|networkpolicies)$</field>
+    <field name="objectRef.namespace" type="pcre2">^.+$</field>
+    <field name="objectRef.name" type="pcre2">^.+$</field>
+    <field name="user.username" type="pcre2">^.+$</field>
+    <field name="requestURI" type="pcre2">^(?!.*[?\x26]dryRun=All(?:\x26|$)).+$</field>
+    <description>Kubernetes namespaced audit event</description>
+  </rule>
+
+  <rule id="110411" level="2">
+    <if_sid>110410</if_sid>
+    <field name="stage">^ResponseComplete$</field>
+    <field name="responseStatus.code" type="pcre2">^2\d\d$</field>
+    <field name="verb" type="pcre2">^(patch|update)$</field>
+    <field name="objectRef.resource">^pods$</field>
+    <field name="objectRef.subresource">^ephemeralcontainers$</field>
+    <description>Pod ephemeral container configuration changed</description>
+  </rule>
+  <rule id="110412" level="2">
+    <if_sid>110410</if_sid>
+    <field name="stage">^ResponseStarted$</field>
+    <field name="responseStatus.code" type="pcre2">^(101|2\d\d)$</field>
+    <field name="verb" type="pcre2">^(get|create)$</field>
+    <field name="objectRef.resource">^pods$</field>
+    <field name="objectRef.subresource">^attach$</field>
+    <description>Pod attach stream started</description>
+  </rule>
+  <rule id="110413" level="9" frequency="2" timeframe="300">
+    <if_sid>110412</if_sid>
+    <if_matched_sid>110411</if_matched_sid>
+    <same_field>objectRef.namespace</same_field>
+    <same_field>objectRef.name</same_field>
+    <description>Attach after ephemeral container change on $(objectRef.namespace)/$(objectRef.name)</description>
+  </rule>
+
+  <rule id="110421" level="2">
+    <if_sid>110410</if_sid>
+    <field name="stage">^ResponseComplete$</field>
+    <field name="responseStatus.code" type="pcre2">^2\d\d$</field>
+    <field name="objectRef.apiGroup" type="pcre2">^rbac\.authorization\.k8s\.io$</field>
+    <field name="objectRef.resource">^rolebindings$</field>
+    <field name="verb">^create$</field>
+    <description>RoleBinding created</description>
+  </rule>
+  <rule id="110422" level="2">
+    <if_sid>110410</if_sid>
+    <field name="stage">^ResponseComplete$</field>
+    <field name="responseStatus.code" type="pcre2">^2\d\d$</field>
+    <field name="objectRef.apiGroup" type="pcre2">^rbac\.authorization\.k8s\.io$</field>
+    <field name="objectRef.resource">^rolebindings$</field>
+    <field name="verb">^delete$</field>
+    <description>RoleBinding deleted</description>
+  </rule>
+  <rule id="110423" level="8" frequency="2" timeframe="180">
+    <if_sid>110422</if_sid>
+    <if_matched_sid>110421</if_matched_sid>
+    <same_field>objectRef.namespace</same_field>
+    <same_field>objectRef.name</same_field>
+    <description>Short-lived RoleBinding $(objectRef.namespace)/$(objectRef.name)</description>
+  </rule>
+
+  <rule id="110431" level="2">
+    <if_sid>110410</if_sid>
+    <field name="stage">^ResponseComplete$</field>
+    <field name="responseStatus.code">^201$</field>
+    <field name="verb">^create$</field>
+    <field name="objectRef.resource">^serviceaccounts$</field>
+    <field name="objectRef.subresource">^token$</field>
+    <field name="user.username" type="pcre2">^(?!system:node:).+$</field>
+    <description>Non-node principal obtained a service account token</description>
+  </rule>
+  <rule id="110432" level="8" frequency="2" timeframe="90">
+    <if_sid>110431</if_sid>
+    <if_matched_sid>110431</if_matched_sid>
+    <same_field>user.username</same_field>
+    <same_field>objectRef.namespace</same_field>
+    <different_field>objectRef.name</different_field>
+    <description>$(user.username) obtained tokens for different service accounts in $(objectRef.namespace)</description>
+  </rule>
+
+  <rule id="110441" level="2">
+    <if_sid>110410</if_sid>
+    <field name="stage">^ResponseComplete$</field>
+    <field name="responseStatus.code" type="pcre2">^2\d\d$</field>
+    <field name="verb">^delete$</field>
+    <field name="objectRef.apiGroup" type="pcre2">^networking\.k8s\.io$</field>
+    <field name="objectRef.resource">^networkpolicies$</field>
+    <description>NetworkPolicy deleted</description>
+  </rule>
+  <rule id="110442" level="10" frequency="2" timeframe="120">
+    <if_sid>110441</if_sid>
+    <if_matched_sid>110441</if_matched_sid>
+    <same_field>user.username</same_field>
+    <different_field>objectRef.namespace</different_field>
+    <description>$(user.username) deleted NetworkPolicies across namespaces</description>
+  </rule>
+</group>
